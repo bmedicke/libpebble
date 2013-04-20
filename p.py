@@ -25,7 +25,7 @@ def cmd_launch_app(pebble, args):
     pebble.launcher_message(args.app_uuid, "RUNNING")
 
 def cmd_remote(pebble, args):
-    def do_oscacript(command):
+    def do_osascript(command):
         cmd = "osascript -e 'tell application \""+args.app_name+"\" to "+command+"'"
         try:
             return subprocess.check_output(cmd, shell=True)
@@ -39,13 +39,13 @@ def cmd_remote(pebble, args):
             "PREVIOUS": "previous track",
             "NEXT": "next track"
         }
-        do_oscacript(events[resp])
+        do_osascript(events[resp])
         update_metadata()
 
     def update_metadata():
-        artist = do_oscacript("artist of current track as string")
-        title = do_oscacript("name of current track as string")
-        album = do_oscacript("album of current track as string")
+        artist = do_osascript("artist of current track as string")
+        title = do_osascript("name of current track as string")
+        album = do_osascript("album of current track as string")
 
         if not artist or not title or not album:
             pebble.set_nowplaying_metadata("No Music Found", "", "")
