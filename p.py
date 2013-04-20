@@ -24,6 +24,79 @@ def cmd_load_fw(pebble, args):
 def cmd_launch_app(pebble, args):
     pebble.launcher_message(args.app_uuid, "RUNNING")
 
+def cmd_nc(pebble, args):
+    def do_osascript(command):
+        cmd = command
+        try:
+            return subprocess.check_output(cmd, shell=True)
+        except subprocess.CalledProcessError:
+            print "failed"
+            return False
+
+    def nc_control_handler(endpoint, resp):
+        events = {
+            "PLAYPAUSE": "ncmpcpp toggle",
+            "PREVIOUS": "ncmpcpp prev",
+            "NEXT": "ncmpcpp next"
+        }
+        do_osascript(events[resp])
+        update_metadata()
+
+    def update_metadata():
+        artist = subprocess.check_output("ncmpcpp --now-playing %a", shell=True)
+        title = subprocess.check_output("ncmpcpp --now-playing %t", shell=True)
+        album = subprocess.check_output("ncmpcpp --now-playing %b", shell=True)
+
+        if not artist or not title or not album:
+            pebble.set_nowplaying_metadata("No Music Found", "", "")
+        else:
+            pebble.set_nowplaying_metadata(title, album, artist)
+
+    pebble.register_endpoint("MUSIC_CONTROL", nc_control_handler)
+
+    try:
+        while True:
+            update_metadata()
+            time.sleep(5)
+    except KeyboardInterrupt:
+        return
+
+def cmd_plex(pebble, args):
+    def do_osascript(command):
+        cmd = "osascript -e 'tell application \"System Events\" to key code "+command+"'"
+        try:
+            return subprocess.check_output(cmd, shell=True)
+        except subprocess.CalledProcessError:
+            print "Failed to send message to System Events, is it running?"
+            return False
+
+    def plex_control_handler(endpoint, resp):
+        events = {
+            "PLAYPAUSE": "36", # enter
+            "PREVIOUS": "125", # down
+            "NEXT": "53"       # escape
+        }
+        do_osascript(events[resp])
+
+    def update_metadata():
+        artist = subprocess.check_output("date +%H:%M", shell=True)
+        title = " " #subprocess.check_output("ncmpcpp --now-playing", shell=True)
+        album = " "
+
+        if not artist or not title or not album:
+            pebble.set_nowplaying_metadata("No Music Found", "", "")
+        else:
+            pebble.set_nowplaying_metadata(title, album, artist)
+
+    pebble.register_endpoint("MUSIC_CONTROL", plex_control_handler)
+
+    try:
+        while True:
+            update_metadata()
+            time.sleep(5)
+    except KeyboardInterrupt:
+        return
+
 def cmd_remote(pebble, args):
     def do_osascript(command):
         cmd = "osascript -e 'tell application \""+args.app_name+"\" to "+command+"'"
@@ -205,6 +278,11 @@ def main():
     remote_parser.add_argument('app_name', type=str, help='title of application to be controlled')
     remote_parser.set_defaults(func=cmd_remote)
 
+    plex_parser = subparsers.add_parser('plex', help='control plex (next, pause, back)')
+    plex_parser.set_defaults(func=cmd_plex)
+
+    nc_parser = subparsers.add_parser('nc', help='control ncmpcpp (prev, pause, next)')
+    nc_parser.set_defaults(func=cmd_nc)
 
     args = parser.parse_args()
 
